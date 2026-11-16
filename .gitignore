@@ -1,0 +1,13 @@
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Logs and local scratch files
+*.log
+npm-debug.log*
+
+# Dependencies (there is no build step, but keep the repo clean if you add one)
+node_modules/

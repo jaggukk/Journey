@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#101113">
+  <meta name="description" content="journey — a small, private desktop for notes, pictures, and the things you are working through.">
+  <title>journey</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23101113'/%3E%3Cpath d='M6 10.5h7l2.2 2.5H26v10.5H6z' fill='none' stroke='%23f0f0f0' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cpath d='M6 10.5V8h7l2.2 2.5' fill='none' stroke='%23f0f0f0' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app" class="app">
+    <header class="site-header">
+      <h1 class="site-title">journey</h1>
+      <button class="reopen-files" id="reopen-files" type="button" hidden>files</button>
+      <span class="site-rule" aria-hidden="true"></span>
+    </header>
+    <main class="workspace" id="workspace" aria-label="journey desktop"></main>
+  </div>
+
+  <div id="overlay-root"></div>
+  <div id="menu-root"></div>
+  <div class="toast-root" id="toast-root" role="status" aria-live="polite"></div>
+
+  <input type="file" id="inline-image-input" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" hidden>
+  <input type="file" id="image-upload-input" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple hidden>
+  <input type="file" id="backup-import-input" accept="application/json,.json" hidden>
+
+  <script src="js/core.js" defer></script>
+  <script src="js/data.js" defer></script>
+  <script src="js/ui.js" defer></script>
+  <script src="js/media.js" defer></script>
+  <script src="js/windows.js" defer></script>
+  <script src="js/notes.js" defer></script>
+  <script src="js/fonts.js" defer></script>
+  <script src="js/files.js" defer></script>
+  <script src="js/backup.js" defer></script>
+  <script src="js/main.js" defer></script>
+</body>
+</html>
