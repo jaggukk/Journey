@@ -305,7 +305,7 @@
       "</ul>",
       "<p>Use the buttons at the bottom of the files window to add a folder, a note, or a picture. You can also drop images straight into the tree. Inside a note, the toolbar handles headings, fonts, lists, links, and pictures.</p>",
       "<p><strong>Aa</strong> opens <strong>Font styles</strong>. Paste a Google Fonts <code>@import</code> — or simply type the name of a font — and it becomes available in every note.</p>",
-      "<p>Everything is stored in this browser. Export a backup from the <strong>⋯</strong> menu. Focus a window and the URL changes, so you can bookmark a file.</p>",
+      "<p>Everything is stored by your journey server, in the project's <code>data</code> folder. Export a backup from the <strong>⋯</strong> menu. Focus a window and the URL changes, so you can bookmark a file.</p>",
       "<p><em>Replace this starter content with your own. All of it is editable.</em></p>"
     ].join(""));
 

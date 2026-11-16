@@ -4,11 +4,6 @@
   const J = (window.Journey = window.Journey || {});
 
   J.APP_TITLE = "journey";
-  J.DB_NAME = "journey-db";
-  J.DB_VERSION = 1;
-  J.STORE_META = "meta";
-  J.STORE_DOCS = "docs";
-  J.LS_PREFIX = "journey.";
   J.SAMPLE_ART = "assets/monochrome-study.svg";
   J.WELCOME_EXAMPLE =
     "<style>@import url('https://fonts.googleapis.com/css2?family=Shadows+Into+Light&display=swap');</style>";
@@ -119,159 +114,143 @@
     return String(filename || "").replace(/\.[^.\/\\]+$/, "");
   };
 
-  J.storage = {
-    fallback: false,
-    unavailable: false,
-    db: null
-  };
+  const API_ROOT = "/api";
 
-  function openDatabase() {
-    return new Promise((resolve, reject) => {
-      if (!("indexedDB" in window)) {
-        reject(new Error("IndexedDB unavailable"));
-        return;
-      }
-      let request;
+  async function apiRequest(resource, options) {
+    const opts = options || {};
+    const request = {
+      method: opts.method || "GET",
+      cache: "no-store",
+      credentials: "include",
+      headers: { Accept: "application/json" }
+    };
+    if (opts.body !== undefined) {
+      request.headers["Content-Type"] = "application/json";
+      request.body = JSON.stringify(opts.body);
+    }
+
+    let response;
+    try {
+      response = await fetch(API_ROOT + resource, request);
+    } catch (error) {
+      const networkError = new Error("The journey server could not be reached.");
+      networkError.cause = error;
+      throw networkError;
+    }
+
+    const text = await response.text();
+    let payload = {};
+    if (text) {
       try {
-        request = indexedDB.open(J.DB_NAME, J.DB_VERSION);
+        payload = JSON.parse(text);
       } catch (error) {
-        reject(error);
-        return;
+        if (response.ok) throw new Error("The journey server sent an unreadable response.");
       }
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(J.STORE_META)) db.createObjectStore(J.STORE_META);
-        if (!db.objectStoreNames.contains(J.STORE_DOCS)) db.createObjectStore(J.STORE_DOCS);
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error || new Error("Could not open the local database"));
-      request.onblocked = () => reject(new Error("The local database is blocked by another window"));
-    });
+    }
+
+    if (!response.ok) {
+      const apiError = new Error(payload.error || "The journey server could not complete that request.");
+      apiError.status = response.status;
+      throw apiError;
+    }
+    return payload;
   }
 
-  function idbRequest(request) {
-    return new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error || new Error("Local storage request failed"));
-    });
-  }
+  J.storage = {
+    server: true,
+    unavailable: false,
+    backend: "filesystem",
+    images: "inline"
+  };
+  J.readOnly = false;
+  J.adminConfigured = false;
 
   J.initStorage = async function initStorage() {
     try {
-      J.storage.db = await openDatabase();
-      J.storage.fallback = false;
-    } catch (error) {
-      console.warn("journey: falling back to localStorage", error);
-      J.storage.db = null;
-      J.storage.fallback = true;
-      try {
-        localStorage.setItem("journey.storage.test", "1");
-        localStorage.removeItem("journey.storage.test");
-      } catch (storageError) {
-        J.storage.unavailable = true;
-        throw new Error("This browser is not allowing local storage for this page.");
+      const health = await apiRequest("/health");
+      if (!health.ok || health.storage !== "server") {
+        throw new Error("The journey server did not report a healthy storage service.");
       }
+      J.storage.server = true;
+      J.storage.unavailable = false;
+      J.storage.backend = health.backend || "filesystem";
+      J.storage.images = health.images === "blob" ? "blob" : "inline";
+      J.readOnly = !health.canEdit;
+      J.adminConfigured = Boolean(health.adminConfigured);
+    } catch (error) {
+      J.storage.server = false;
+      J.storage.unavailable = true;
+      const connectionError = new Error(
+        "The journey server is not available. Start it with “npm start”, then reload this page."
+      );
+      connectionError.cause = error;
+      throw connectionError;
     }
   };
 
-  function lsKey(key) {
-    return J.LS_PREFIX + key;
-  }
+  J.authLogin = async function authLogin(password) {
+    await apiRequest("/auth/login", {
+      method: "POST",
+      body: { password }
+    });
+    J.readOnly = false;
+  };
+
+  J.authLogout = async function authLogout() {
+    await apiRequest("/auth/logout", { method: "POST", body: {} });
+    J.readOnly = true;
+  };
+
+  J.uploadPreparedImage = async function uploadPreparedImage(prepared) {
+    if (J.storage.images !== "blob") return prepared.dataUrl;
+    const payload = await apiRequest("/images", {
+      method: "POST",
+      body: { dataUrl: prepared.dataUrl }
+    });
+    if (!payload.url) throw new Error("The picture server did not return an address.");
+    return payload.url;
+  };
 
   J.storageGetMeta = async function storageGetMeta() {
     if (J.storage.unavailable) return undefined;
-    if (J.storage.fallback) {
-      try {
-        const raw = localStorage.getItem(lsKey("state"));
-        return raw ? JSON.parse(raw) : undefined;
-      } catch (error) {
-        return undefined;
-      }
-    }
-    return idbRequest(J.storage.db.transaction(J.STORE_META, "readonly").objectStore(J.STORE_META).get("state"));
+    const payload = await apiRequest("/state");
+    return payload.state || undefined;
   };
 
   J.storageSetMeta = async function storageSetMeta(stateObject) {
     if (J.storage.unavailable) return false;
-    if (J.storage.fallback) {
-      localStorage.setItem(lsKey("state"), JSON.stringify(stateObject));
-      return true;
-    }
-    await idbRequest(J.storage.db.transaction(J.STORE_META, "readwrite").objectStore(J.STORE_META).put(stateObject, "state"));
+    await apiRequest("/state", { method: "PUT", body: { state: stateObject } });
     return true;
   };
 
   J.storageGetAllDocs = async function storageGetAllDocs() {
     if (J.storage.unavailable) return {};
-    if (J.storage.fallback) {
-      const result = {};
-      for (let i = 0; i < localStorage.length; i += 1) {
-        const key = localStorage.key(i);
-        if (key && key.indexOf(lsKey("doc.")) === 0) {
-          const id = key.slice(lsKey("doc.").length);
-          try {
-            result[id] = JSON.parse(localStorage.getItem(key));
-          } catch (error) {
-            // Ignore a malformed record; the note will open empty.
-          }
-        }
-      }
-      return result;
-    }
-    return new Promise((resolve, reject) => {
-      const result = {};
-      const store = J.storage.db.transaction(J.STORE_DOCS, "readonly").objectStore(J.STORE_DOCS);
-      const request = store.openCursor();
-      request.onsuccess = () => {
-        const cursor = request.result;
-        if (cursor) {
-          result[cursor.key] = cursor.value;
-          cursor.continue();
-        } else {
-          resolve(result);
-        }
-      };
-      request.onerror = () => reject(request.error || new Error("Could not read notes"));
-    });
+    const payload = await apiRequest("/docs");
+    return payload.docs && typeof payload.docs === "object" ? payload.docs : {};
   };
 
   J.storageSetDoc = async function storageSetDoc(id, value) {
     if (J.storage.unavailable) return false;
-    if (J.storage.fallback) {
-      localStorage.setItem(lsKey("doc." + id), JSON.stringify(value));
-      return true;
-    }
-    await idbRequest(J.storage.db.transaction(J.STORE_DOCS, "readwrite").objectStore(J.STORE_DOCS).put(value, id));
+    await apiRequest("/docs/" + encodeURIComponent(id), {
+      method: "PUT",
+      body: { value }
+    });
     return true;
   };
 
   J.storageDeleteDocs = async function storageDeleteDocs(ids) {
     if (!ids.length || J.storage.unavailable) return;
-    if (J.storage.fallback) {
-      ids.forEach((id) => localStorage.removeItem(lsKey("doc." + id)));
-      return;
-    }
-    await new Promise((resolve, reject) => {
-      const transaction = J.storage.db.transaction(J.STORE_DOCS, "readwrite");
-      const store = transaction.objectStore(J.STORE_DOCS);
-      ids.forEach((id) => store.delete(id));
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error || new Error("Could not delete notes"));
-    });
+    await apiRequest("/docs", { method: "DELETE", body: { ids } });
   };
 
-  J.storageClearDocs = async function storageClearDocs() {
-    if (J.storage.unavailable) return;
-    if (J.storage.fallback) {
-      const keys = [];
-      for (let i = 0; i < localStorage.length; i += 1) {
-        const key = localStorage.key(i);
-        if (key && key.indexOf(lsKey("doc.")) === 0) keys.push(key);
-      }
-      keys.forEach((key) => localStorage.removeItem(key));
-      return;
+  J.storageReplaceJournal = async function storageReplaceJournal(stateObject, docs) {
+    if (J.storage.unavailable) {
+      throw new Error("The journey server is not available.");
     }
-    await idbRequest(J.storage.db.transaction(J.STORE_DOCS, "readwrite").objectStore(J.STORE_DOCS).clear());
+    await apiRequest("/import", {
+      method: "POST",
+      body: { state: stateObject, docs }
+    });
   };
 
   J.storageWarned = false;
@@ -281,49 +260,73 @@
     if (J.storageWarned) return;
     J.storageWarned = true;
     const text = message || (
-      error && /quota/i.test(String(error.name) + String(error.message))
-        ? "This browser is out of local space. Try smaller pictures or export a backup."
-        : "Could not save to this browser. Export a backup so your work is not lost."
+      error && error.status === 413
+        ? "That change is too large for the journey server. Try a smaller picture or export a backup."
+        : "Could not save to the journey server. Your latest change may not be on disk."
     );
     if (J.toast) J.toast(text, { error: true, duration: 6000 });
   };
 
-  J.persistMetaSoon = (() => {
-    let timer = null;
-    return function persistMetaSoon() {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        J.persistMetaNow().catch((error) => J.reportStorageError(error));
-      }, 160);
-    };
-  })();
-
-  J.persistMetaNow = async function persistMetaNow() {
-    if (!J.state) return;
-    try {
-      await J.storageSetMeta(J.state);
-    } catch (error) {
-      J.reportStorageError(error);
-    }
-  };
-
+  J.persistenceSuspended = false;
   J.pendingDocs = new Map();
 
+  let metaTimer = null;
+  let metaSave = null;
+  const activeDocSaves = new Set();
+
+  function saveDocNow(id, value, onState) {
+    const request = J.storageSetDoc(id, value)
+      .then(() => {
+        if (onState) onState("saved");
+        J.storageWarned = false;
+      })
+      .catch((error) => {
+        if (onState) onState("error");
+        J.reportStorageError(error);
+      })
+      .finally(() => {
+        activeDocSaves.delete(request);
+      });
+    activeDocSaves.add(request);
+    return request;
+  }
+
+  J.persistMetaSoon = function persistMetaSoon() {
+    if (J.persistenceSuspended || J.readOnly) return;
+    clearTimeout(metaTimer);
+    metaTimer = setTimeout(() => {
+      metaTimer = null;
+      J.persistMetaNow().catch((error) => J.reportStorageError(error));
+    }, 160);
+  };
+
+  J.persistMetaNow = async function persistMetaNow() {
+    if (!J.state || J.persistenceSuspended || J.readOnly) return;
+    clearTimeout(metaTimer);
+    metaTimer = null;
+    const stateSnapshot = JSON.parse(JSON.stringify(J.state));
+    const request = J.storageSetMeta(stateSnapshot)
+      .then(() => {
+        J.storageWarned = false;
+      })
+      .catch((error) => {
+        J.reportStorageError(error);
+      })
+      .finally(() => {
+        if (metaSave === request) metaSave = null;
+      });
+    metaSave = request;
+    await request;
+  };
+
   J.scheduleDocSave = function scheduleDocSave(id, value, onState) {
+    if (J.persistenceSuspended || J.readOnly) return;
     const existing = J.pendingDocs.get(id);
     if (existing) clearTimeout(existing.timer);
     if (onState) onState("saving");
     const timer = setTimeout(() => {
       J.pendingDocs.delete(id);
-      J.storageSetDoc(id, value)
-        .then(() => {
-          if (onState) onState("saved");
-        })
-        .catch((error) => {
-          if (onState) onState("error");
-          J.reportStorageError(error);
-        });
+      saveDocNow(id, value, onState);
     }, 480);
     J.pendingDocs.set(id, { timer, value, onState });
   };
@@ -333,27 +336,14 @@
     if (!pending) return Promise.resolve();
     clearTimeout(pending.timer);
     J.pendingDocs.delete(id);
-    return J.storageSetDoc(id, pending.value)
-      .then(() => {
-        if (pending.onState) pending.onState("saved");
-      })
-      .catch((error) => {
-        if (pending.onState) pending.onState("error");
-        J.reportStorageError(error);
-      });
+    return saveDocNow(id, pending.value, pending.onState);
   };
 
   J.flushAllDocs = function flushAllDocs() {
     const promises = [];
     J.pendingDocs.forEach((pending, id) => {
       clearTimeout(pending.timer);
-      promises.push(
-        J.storageSetDoc(id, pending.value)
-          .then(() => {
-            if (pending.onState) pending.onState("saved");
-          })
-          .catch((error) => J.reportStorageError(error))
-      );
+      promises.push(saveDocNow(id, pending.value, pending.onState));
     });
     J.pendingDocs.clear();
     return Promise.all(promises);
@@ -362,5 +352,23 @@
   J.flushMeta = async function flushMeta() {
     if (!J.state) return;
     await J.persistMetaNow();
+  };
+
+  J.suspendPersistence = function suspendPersistence() {
+    J.persistenceSuspended = true;
+    clearTimeout(metaTimer);
+    metaTimer = null;
+    J.pendingDocs.forEach((pending) => clearTimeout(pending.timer));
+    J.pendingDocs.clear();
+  };
+
+  J.resumePersistence = function resumePersistence() {
+    J.persistenceSuspended = false;
+  };
+
+  J.waitForPendingWrites = async function waitForPendingWrites() {
+    const writes = Array.from(activeDocSaves);
+    if (metaSave) writes.push(metaSave);
+    await Promise.allSettled(writes);
   };
 })();

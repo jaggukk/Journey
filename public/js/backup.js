@@ -43,38 +43,32 @@
     try {
       const text = await file.text();
       const payload = JSON.parse(text);
-      if (!payload || !payload.state) throw new Error("This is not a journey backup.");
+      if (!payload || !payload.state) throw new Error("This is not a JAGAN K K backup.");
       const newState = J.normalizeState(payload.state);
       if (!newState) throw new Error("This backup does not contain a readable file tree.");
       const newDocs = J.ensureDocs(newState, payload.docs || {});
       const fileCount = Object.keys(newDocs).length;
       const confirmed = await J.confirmDialog({
         title: "Import backup",
-        message: "Replace everything currently in journey with this backup? It contains " + fileCount +
+        message: "Replace everything currently in JAGAN K K with this backup? It contains " + fileCount +
           " " + (fileCount === 1 ? "file" : "files") + ". This cannot be undone.",
         confirmLabel: "Replace everything",
         danger: true
       });
       if (!confirmed) return;
 
-      // Let any in-flight autosave finish before the stores are cleared.
+      // Finish old writes, then stop persistence so no timer can overwrite the import.
       await J.flushAllDocs();
-      J.pendingDocs.forEach((pending) => clearTimeout(pending.timer));
-      J.pendingDocs.clear();
+      J.suspendPersistence();
+      await J.waitForPendingWrites();
 
-      await J.storageClearDocs();
-      const ids = Object.keys(newDocs);
-      for (const id of ids) {
-        await J.storageSetDoc(id, newDocs[id]);
-      }
-      await J.storageSetMeta(newState);
+      await J.storageReplaceJournal(newState, newDocs);
 
       // Adopt the imported state before the reload. The beforeunload handler
       // flushes J.state, so leaving the old object here would overwrite the
       // import we just wrote.
       J.state = newState;
       J.docs = newDocs;
-      J.pendingDocs.clear();
       J.applyCustomFontImports();
       J.toast("Backup imported. Reloading…");
       setTimeout(() => {
@@ -82,6 +76,7 @@
         location.reload();
       }, 250);
     } catch (error) {
+      J.resumePersistence();
       console.error(error);
       J.toast(error.message || "That backup could not be imported.", { error: true, duration: 5000 });
     }

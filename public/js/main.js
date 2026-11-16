@@ -20,20 +20,20 @@
   }
 
   async function loadOrSeed() {
-    let loadedState = null;
-    let loadedDocs = {};
+    let rawState;
     try {
-      const rawState = await J.storageGetMeta();
-      if (rawState) {
-        loadedState = J.normalizeState(rawState);
-        if (loadedState) loadedDocs = await J.storageGetAllDocs();
-      }
+      rawState = await J.storageGetMeta();
     } catch (error) {
-      console.error("journey: could not read saved data", error);
-      J.toast("The saved index could not be read. Starting with the starter files.", { error: true, duration: 6000 });
+      J.reportStorageError(error, "The journey server could not be read, so nothing was opened.");
+      throw error;
     }
 
-    if (loadedState) {
+    if (rawState) {
+      const loadedState = J.normalizeState(rawState);
+      if (!loadedState) {
+        throw new Error("The saved journal is not readable. Restore a backup or check the data folder.");
+      }
+      const loadedDocs = await J.storageGetAllDocs();
       J.state = loadedState;
       J.docs = J.ensureDocs(loadedState, loadedDocs);
       try {
@@ -44,17 +44,18 @@
       return;
     }
 
+    if (J.readOnly) return false;
+
     const seed = J.seedContent();
     J.state = seed.state;
     J.docs = seed.docs;
     try {
-      await J.storageSetMeta(J.state);
-      for (const [id, value] of Object.entries(J.docs)) {
-        await J.storageSetDoc(id, value);
-      }
+      await J.storageReplaceJournal(J.state, J.docs);
     } catch (error) {
-      J.reportStorageError(error);
+      J.reportStorageError(error, "The starter journal could not be created on the server.");
+      throw error;
     }
+    return true;
   }
 
   function openInitialNote() {
@@ -162,21 +163,18 @@
     try {
       await J.initStorage();
     } catch (error) {
-      console.warn("journey: storage unavailable", error);
-      J.storage.unavailable = true;
-      J.storage.fallback = true;
+      console.error("journey: server unavailable", error);
+      if (boot) {
+        boot.textContent = error.message;
+        boot.classList.add("is-error");
+      }
+      return;
     }
 
     await loadOrSeed();
     J.applyCustomFontImports();
     wireGlobalEvents();
-
-    if (J.storage.unavailable) {
-      J.toast(
-        "This browser is blocking local storage, so changes will be lost when you close the page. Export a backup before you leave.",
-        { error: true, duration: 10000 }
-      );
-    }
+    J.initAdmin();
 
     if (boot) boot.remove();
     J.openFilesWindow();
@@ -191,8 +189,8 @@
     if (workspace) {
       workspace.textContent = "";
       const message = document.createElement("div");
-      message.className = "boot-note";
-      message.textContent = "journey could not start. Please reload the page.";
+      message.className = "boot-note is-error";
+      message.textContent = error.message || "journey could not start. Please reload the page.";
       workspace.appendChild(message);
     }
   });

@@ -32,7 +32,8 @@
     }
   };
 
-  J.showMenu = function showMenu(items, x, y) {
+  J.showMenu = function showMenu(items, x, y, options) {
+    const opts = options || {};
     J.closeMenu();
     const root = document.getElementById("menu-root");
     if (!root) return;
@@ -90,7 +91,12 @@
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const rect = menu.getBoundingClientRect();
-    const left = J.clamp(x, margin, Math.max(margin, viewportWidth - rect.width - margin));
+    const requestedLeft = opts.align === "end" ? x - rect.width : x;
+    const left = J.clamp(
+      requestedLeft,
+      margin,
+      Math.max(margin, viewportWidth - rect.width - margin)
+    );
     const top = J.clamp(y, margin, Math.max(margin, viewportHeight - rect.height - margin));
     menu.style.left = left + "px";
     menu.style.top = top + "px";
@@ -140,12 +146,15 @@
       window.removeEventListener("resize", onViewportChange);
       window.removeEventListener("blur", onViewportChange);
       menu.removeEventListener("keydown", onKeyDown);
+      if (typeof opts.onClose === "function") opts.onClose();
     };
   };
 
-  J.showMenuForButton = function showMenuForButton(button, items) {
+  J.showMenuForButton = function showMenuForButton(button, items, options) {
+    const opts = options || {};
     const rect = button.getBoundingClientRect();
-    J.showMenu(items, rect.left, rect.bottom + 4);
+    const x = opts.align === "end" ? rect.right : rect.left;
+    J.showMenu(items, x, rect.bottom + 4, opts);
   };
 
   function focusableElements(container) {

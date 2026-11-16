@@ -1,19 +1,32 @@
 # journey
 
 A small, private desktop for notes, pictures, and font styles. It looks and behaves like a
-file browser: files on the left, documents in their own windows, everything saved in the
-browser on this computer.
+file browser: files on the left, documents in their own windows, and everything saved by a
+local Node.js server.
 
-## Open it
+## Run it
 
-Double-click `index.html`. There is no build step and no server to run.
+Requires Node.js 20 or newer.
 
-Chrome, Edge, and Firefox are the best options. Everything is stored locally in IndexedDB
-(with a localStorage fallback), so the same browser remembers your work; a different browser
-or a private window starts fresh.
+```powershell
+npm install
+npm start
+```
 
-> If a browser blocks local storage for pages opened from disk, journey still runs but
-> cannot save. It will say so on load. Use **Export backup** before closing if that happens.
+Open <http://127.0.0.1:3000>.
+
+For development with automatic server restarts:
+
+```powershell
+npm run dev
+```
+
+The server listens on `127.0.0.1` by default, so it is only reachable from this computer. To
+run tests:
+
+```powershell
+npm test
+```
 
 ## What you can do
 
@@ -29,7 +42,7 @@ or a private window starts fresh.
 - Click a title bar to drag, drag the bottom-right corner to resize, double-click the title
   bar to fill the screen.
 - Toolbar: text style, font, bold/italic/underline, lists, links, insert picture, font styles.
-- Paste or drop images straight into the text. They are compressed and stored with the note.
+- Paste or drop images straight into the text. They are compressed and saved with the note.
 - `Ctrl/⌘ + S` saves immediately (it also autosaves while you type).
 
 **Pictures** — adding an image also creates a file in the tree. Opening it shows the picture
@@ -62,22 +75,57 @@ menu. Bare names are looked up on Google Fonts. Fonts need an internet connectio
 time; the browser caches them afterwards.
 
 **Backups** — the `⋯` menu in the files footer has **Export backup** and **Import backup…**.
-The export is a single JSON file containing the tree, every note, and every picture.
+The export is a single JSON file containing the tree, every note, and every picture. Imports
+replace the complete journal in one server-side operation.
 
 ## Your data
 
-- Stored per browser, on this machine, under the IndexedDB database `journey-db`.
-- No server, no accounts, no analytics.
-- Clearing site data for this page deletes the journal, so export a backup now and then.
-- Starter notes, the mock folder tree, and the sample artwork are demo content. Edit or
-  delete all of it.
+- Stored on this machine in `data/generations/`, managed by the Node server.
+- The server writes state and document files atomically and keeps backups hidden from the
+  static web routes.
+- No accounts, analytics, or external application database.
+- To move an existing browser-only journal into this version, open the old version, use
+  **Export backup**, then use **Import backup…** in the Node version. Browsers do not allow a
+  server on `localhost` to read IndexedDB data saved under a different origin.
+- `data/` is ignored by Git. Export a backup now and then.
+
+### Server configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `3000` | HTTP port |
+| `HOST` | `127.0.0.1` | Interface to bind; use `0.0.0.0` to allow LAN access |
+| `JOURNEY_DATA_DIR` | `./data` | Journal storage directory |
+| `JOURNEY_REQUEST_LIMIT` | `100mb` | Maximum JSON request size |
+
+The server has no authentication. Keep the default loopback host unless you intentionally
+want other devices on your network to reach it.
+
+## API
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | Server and storage health |
+| `GET` | `/api/state` | File tree, fonts, and window state |
+| `PUT` | `/api/state` | Save the file tree and UI state |
+| `GET` | `/api/docs` | Read every note and image record |
+| `PUT` | `/api/docs/:id` | Save one note or image record |
+| `DELETE` | `/api/docs` | Delete records by ID |
+| `GET` | `/api/journal` | Read state and documents together |
+| `POST` | `/api/import` | Atomically replace the complete journal |
 
 ## Files
 
 ```
-index.html                 entry point
+package.json               Node project and scripts
+src/server.js              HTTP server startup and configuration
+src/app.js                 Express routes and static assets
+src/journal-store.js       Atomic on-disk journal storage
+src/validation.js          Server-side state and document validation
+test/api.test.js           API and storage tests
+index.html                 browser entry point
 styles.css                 all visual styling
-js/core.js                 icons, helpers, IndexedDB/localStorage, autosave
+js/core.js                 icons, helpers, API client, autosave
 js/data.js                 starter content, state normalization, HTML sanitizer
 js/ui.js                   dialogs, context menus, toasts
 js/windows.js              window manager (drag, resize, minimize, maximize, permalinks)

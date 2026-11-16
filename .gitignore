@@ -9,5 +9,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# Dependencies (there is no build step, but keep the repo clean if you add one)
+# Dependencies
 node_modules/
+
+# Server-side journal data
+data/
+.env

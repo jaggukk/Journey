@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-delegated: plain HTML, CSS, and JavaScript with no build step, so the site opens directly from disk. Data is stored locally in IndexedDB with a localStorage fallback.
+Node.js 20+ with Express 5 serving a plain HTML, CSS, and JavaScript client. Journal state and documents are stored on disk by the Node server; the browser keeps only transient UI state.
 
 ## Users
 
@@ -16,7 +16,7 @@ One person, using their own computer as a private place to keep a personal recor
 
 ## Product Purpose
 
-A journal that looks and behaves like a small desktop file browser. The owner can make folders, write and format notes, add pictures, and keep everything in one place. Success means adding an entry feels as immediate as dropping a file into a folder, and the record survives closing the browser.
+A journal that looks and behaves like a small desktop file browser. The owner can make folders, write and format notes, add pictures, and keep everything in one place. Success means adding an entry feels as immediate as dropping a file into a folder, and the record survives closing the browser because it is persisted by the local Node server.
 
 ## Positioning
 
@@ -24,7 +24,7 @@ A personal archive that is navigated and edited through a faithful, tactile wind
 
 ## Operating Context
 
-Desktop-first, monochrome, quiet. The visitor opens files from a tree, arranges windows, and writes directly in a note. Everything is local to the browser and requires no account.
+Desktop-first, monochrome, quiet. The visitor opens files from a tree, arranges windows, and writes directly in a note. Everything is local to this machine through the Node server and requires no account.
 
 ## Capabilities and Constraints
 
@@ -33,7 +33,7 @@ Desktop-first, monochrome, quiet. The visitor opens files from a tree, arranges 
 - Drag in or upload images; view them in their own window.
 - Add Google Fonts styles by pasting an `@import` / `<style>` snippet or a font name; choose fonts per selection in notes.
 - Drag, resize, minimize, maximize (double-click title bar), and close windows.
-- Export and import a JSON backup; no server, no accounts, no analytics.
+- Export and import a JSON backup; the Node server persists data locally with no accounts or analytics.
 - Demo/starter content is editable and is not a claim about the owner's real life.
 
 ## Brand Commitments

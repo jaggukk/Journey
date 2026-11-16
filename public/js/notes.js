@@ -279,7 +279,7 @@
         dot.className = "save-dot";
         dot.setAttribute("aria-hidden", "true");
         const saveText = document.createElement("span");
-        saveText.textContent = "saved locally";
+        saveText.textContent = "saved";
         saveStatus.appendChild(dot);
         saveStatus.appendChild(saveText);
         const count = document.createElement("span");
@@ -300,7 +300,7 @@
         function setSaveState(state) {
           saveStatus.dataset.state = state;
           if (state === "saving") saveText.textContent = "saving…";
-          else if (state === "saved") saveText.textContent = "saved locally";
+          else if (state === "saved") saveText.textContent = "saved";
           else if (state === "error") saveText.textContent = "not saved";
         }
 

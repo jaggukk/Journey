@@ -67,6 +67,13 @@ body.has-modal {
   letter-spacing: 0.05em;
 }
 
+.boot-note.is-error {
+  width: min(440px, calc(100vw - 48px));
+  color: #c9c9c9;
+  line-height: 1.65;
+  text-align: center;
+}
+
 button,
 input,
 select,
@@ -91,7 +98,8 @@ a {
 .titlebar :focus-visible,
 .menu :focus-visible,
 .dialog :focus-visible,
-.reopen-files:focus-visible {
+.reopen-files:focus-visible,
+.admin-toggle:focus-visible {
   outline-color: #111214;
 }
 
@@ -120,7 +128,7 @@ a {
   font-family: var(--ui-font);
   font-size: 20px;
   font-weight: 400;
-  letter-spacing: 0.012em;
+  letter-spacing: 0.075em;
   line-height: 1;
   user-select: none;
 }
@@ -135,27 +143,72 @@ a {
   background: #24262a;
 }
 
-.reopen-files {
+.header-tools {
   position: absolute;
   top: clamp(22px, 3vh, 31px);
   right: max(22px, 6vw);
   z-index: 2;
-  padding: 4px 9px 5px;
-  border: 1px solid #32353a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reopen-files {
+  padding: 4px 8px 5px;
+  border: 0;
   border-radius: 0;
   background: transparent;
-  color: #b7babe;
+  color: #9a9da1;
   font-size: 10px;
   letter-spacing: 0.08em;
   line-height: 1;
   cursor: pointer;
-  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+  transition: color 100ms ease;
 }
 
 .reopen-files:hover {
   color: #fff;
-  border-color: #6b6f74;
-  background: #17191c;
+}
+
+.reopen-files:active {
+  transform: translateY(1px);
+}
+
+.admin-toggle {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #9a9da1;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 100ms ease;
+}
+
+.admin-toggle:hover {
+  color: #fff;
+}
+
+.admin-toggle:active {
+  transform: translateY(1px);
+}
+
+.admin-toggle.is-authed {
+  color: #17181a;
+}
+
+.admin-toggle.is-authed:hover {
+  color: #0b0c0e;
+}
+
+.setting-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  pointer-events: none;
 }
 
 .reopen-files[hidden] {
@@ -1600,7 +1653,7 @@ a {
     width: calc(100vw - 32px);
   }
 
-  .reopen-files {
+  .header-tools {
     top: 21px;
     right: 16px;
   }
