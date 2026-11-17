@@ -116,6 +116,26 @@
 
   const API_ROOT = "/api";
 
+  function describeApiError(payload, status, text) {
+    const raw = payload && payload.error;
+    if (typeof raw === "string" && raw.trim()) return raw.trim();
+    if (raw && typeof raw === "object") {
+      if (typeof raw.message === "string" && raw.message.trim()) return raw.message.trim();
+      if (typeof raw.code === "string" && raw.code.trim()) {
+        return `${raw.code.trim()} (HTTP ${status}).`;
+      }
+    }
+    if (payload && typeof payload.message === "string" && payload.message.trim()) {
+      return payload.message.trim();
+    }
+    if (typeof text === "string" && text.trim()) {
+      const flattened = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+      const code = flattened.match(/FUNCTION_[A-Z_]+|DEPLOYMENT_[A-Z_]+|NOT_FOUND|BAD_REQUEST/);
+      if (code) return `${code[0]} (HTTP ${status}).`;
+    }
+    return `The journey server could not complete that request (HTTP ${status}).`;
+  }
+
   async function apiRequest(resource, options) {
     const opts = options || {};
     const request = {
@@ -149,7 +169,7 @@
     }
 
     if (!response.ok) {
-      const apiError = new Error(payload.error || "The journey server could not complete that request.");
+      const apiError = new Error(describeApiError(payload, response.status, text));
       apiError.status = response.status;
       throw apiError;
     }
