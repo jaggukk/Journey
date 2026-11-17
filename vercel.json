@@ -4,6 +4,9 @@
   "env": {
     "NODEJS_HELPERS": "0"
   },
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/[...path].js" }
+  ],
   "functions": {
     "api/[...path].js": {
       "maxDuration": 30
