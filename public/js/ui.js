@@ -286,7 +286,14 @@
         try {
           const result = opts.onSubmit ? await opts.onSubmit(content, form) : { ok: true, value: true };
           if (!result || result.ok === false) {
-            error.textContent = (result && result.error) || "Please check that and try again.";
+            const raw = result && result.error;
+            let message;
+            if (typeof raw === "string") {
+              message = raw;
+            } else if (raw && typeof raw.message === "string") {
+              message = raw.message;
+            }
+            error.textContent = message || "Please check that and try again.";
             confirm.disabled = false;
             return;
           }
