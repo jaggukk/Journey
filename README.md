@@ -174,8 +174,8 @@ host unless you intentionally want other devices on your network to reach it.
 | Method | Route | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/health` | Server and storage health |
-| `POST` | `/api/auth/login` | Sign in with the admin username and password |
-| `POST` | `/api/auth/logout` | Sign out |
+| `POST` | `/api/login` | Sign in with the admin username and password |
+| `POST` | `/api/logout` | Sign out |
 | `GET` | `/api/state` | File tree, fonts, and window state |
 | `PUT` | `/api/state` | Save the file tree and UI state |
 | `GET` | `/api/docs` | Read every note and image record |

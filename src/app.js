@@ -78,12 +78,17 @@ export function createApp(options) {
       storage: "server",
       backend: store.kind || "filesystem",
       images: imageMode,
+      runtime: {
+        node: process.version,
+        platform: process.env.VERCEL ? "vercel" : "local",
+        helpers: process.env.NODEJS_HELPERS === "0" ? "disabled" : "default"
+      },
       ...auth.status(request)
     });
   });
 
-  app.post("/api/auth/login", auth.login);
-  app.post("/api/auth/logout", auth.logout);
+  app.post("/api/login", auth.login);
+  app.post("/api/logout", auth.logout);
 
   app.get(
     "/api/state",

@@ -66,7 +66,7 @@ async function startTestServer(t) {
 }
 
 async function signIn(baseUrl, credentials) {
-  const response = await fetch(baseUrl + "/api/auth/login", {
+  const response = await fetch(baseUrl + "/api/login", {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify(
@@ -107,13 +107,13 @@ test("health reports server storage", async (t) => {
 test("sign-in requires the configured username and password", async (t) => {
   const { baseUrl } = await startTestServer(t);
 
-  let result = await jsonRequest(baseUrl, "/api/auth/login", {
+  let result = await jsonRequest(baseUrl, "/api/login", {
     method: "POST",
     body: JSON.stringify({ username: "someone", password: TEST_PASSWORD })
   });
   assert.equal(result.response.status, 401);
 
-  result = await jsonRequest(baseUrl, "/api/auth/login", {
+  result = await jsonRequest(baseUrl, "/api/login", {
     method: "POST",
     body: JSON.stringify({ username: TEST_USERNAME, password: "wrong-password" })
   });

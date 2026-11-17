@@ -211,7 +211,7 @@
   };
 
   J.authLogin = async function authLogin(username, password) {
-    await apiRequest("/auth/login", {
+    await apiRequest("/login", {
       method: "POST",
       body: { username, password }
     });
@@ -219,7 +219,7 @@
   };
 
   J.authLogout = async function authLogout() {
-    await apiRequest("/auth/logout", { method: "POST", body: {} });
+    await apiRequest("/logout", { method: "POST", body: {} });
     J.readOnly = true;
   };
 
