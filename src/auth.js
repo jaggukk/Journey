@@ -131,7 +131,6 @@ export function createAuth(options) {
     return {
       canEdit: canEdit(request),
       adminConfigured: configured,
-      adminUsername: configured ? username : "",
       localDefaults: useLocalDefaults
     };
   }

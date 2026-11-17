@@ -44,7 +44,6 @@
         copy.className = "dialog-copy";
         copy.textContent = "Sign in to create, edit, and delete journal entries.";
         const username = field("username", "Username", "text");
-        if (J.adminUsername) username.input.value = J.adminUsername;
         const password = field("password", "Password", "password");
         content.appendChild(copy);
         content.appendChild(username.label);
@@ -87,7 +86,6 @@
       const health = await response.json();
       J.readOnly = !health.canEdit;
       J.adminConfigured = Boolean(health.adminConfigured);
-      J.adminUsername = typeof health.adminUsername === "string" ? health.adminUsername : "";
       J.adminLocalDefaults = Boolean(health.localDefaults);
       renderAdmin();
       J.toast("Signed out.");

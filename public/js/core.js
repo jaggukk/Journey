@@ -164,7 +164,6 @@
   };
   J.readOnly = false;
   J.adminConfigured = false;
-  J.adminUsername = "";
   J.adminLocalDefaults = false;
 
   J.initStorage = async function initStorage() {
@@ -179,7 +178,6 @@
       J.storage.images = health.images === "blob" ? "blob" : "inline";
       J.readOnly = !health.canEdit;
       J.adminConfigured = Boolean(health.adminConfigured);
-      J.adminUsername = typeof health.adminUsername === "string" ? health.adminUsername : "";
       J.adminLocalDefaults = Boolean(health.localDefaults);
     } catch (error) {
       J.storage.server = false;
