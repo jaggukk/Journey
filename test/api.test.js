@@ -8,6 +8,9 @@ import { createApp } from "../src/app.js";
 import { JournalStore } from "../src/journal-store.js";
 
 const projectDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const TEST_USERNAME = "editor";
+const TEST_PASSWORD = "test-password";
+const TEST_SESSION_SECRET = "test-session-secret";
 
 function stateWithNote(name) {
   return {
@@ -40,7 +43,15 @@ async function startTestServer(t) {
   const dataDirectory = await mkdtemp(path.join(tmpdir(), "journey-test-"));
   const store = new JournalStore(dataDirectory);
   await store.init();
-  const app = createApp({ store, publicDirectory: projectDirectory });
+  const app = createApp({
+    store,
+    publicDirectory: path.join(projectDirectory, "public"),
+    authOptions: {
+      username: TEST_USERNAME,
+      password: TEST_PASSWORD,
+      sessionSecret: TEST_SESSION_SECRET
+    }
+  });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   const address = server.address();
@@ -54,12 +65,27 @@ async function startTestServer(t) {
   return { baseUrl, dataDirectory };
 }
 
+async function signIn(baseUrl, credentials) {
+  const response = await fetch(baseUrl + "/api/auth/login", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(
+      credentials || { username: TEST_USERNAME, password: TEST_PASSWORD }
+    )
+  });
+  assert.equal(response.status, 200);
+  return String(response.headers.get("set-cookie") || "").split(";")[0];
+}
+
 async function jsonRequest(baseUrl, resource, options) {
+  const opts = options || {};
   const response = await fetch(baseUrl + resource, {
-    ...options,
+    method: opts.method || "GET",
+    body: opts.body,
     headers: {
       Accept: "application/json",
-      ...(options && options.body ? { "Content-Type": "application/json" } : {})
+      ...(opts.cookie ? { Cookie: opts.cookie } : {}),
+      ...(opts.body ? { "Content-Type": "application/json" } : {})
     }
   });
   const body = await response.json();
@@ -71,11 +97,46 @@ test("health reports server storage", async (t) => {
   const { response, body } = await jsonRequest(baseUrl, "/api/health");
 
   assert.equal(response.status, 200);
-  assert.deepEqual(body, { ok: true, app: "journey", storage: "server" });
+  assert.equal(body.ok, true);
+  assert.equal(body.app, "journey");
+  assert.equal(body.storage, "server");
+  assert.equal(body.canEdit, false);
+  assert.equal(body.adminConfigured, true);
+});
+
+test("sign-in requires the configured username and password", async (t) => {
+  const { baseUrl } = await startTestServer(t);
+
+  let result = await jsonRequest(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "someone", password: TEST_PASSWORD })
+  });
+  assert.equal(result.response.status, 401);
+
+  result = await jsonRequest(baseUrl, "/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username: TEST_USERNAME, password: "wrong-password" })
+  });
+  assert.equal(result.response.status, 401);
+
+  result = await jsonRequest(baseUrl, "/api/state", {
+    method: "PUT",
+    body: JSON.stringify({ state: stateWithNote("Blocked") })
+  });
+  assert.equal(result.response.status, 401);
+
+  const cookie = await signIn(baseUrl);
+  result = await jsonRequest(baseUrl, "/api/state", {
+    method: "PUT",
+    cookie,
+    body: JSON.stringify({ state: stateWithNote("Allowed") })
+  });
+  assert.equal(result.response.status, 200);
 });
 
 test("state and documents round-trip through the API", async (t) => {
   const { baseUrl } = await startTestServer(t);
+  const cookie = await signIn(baseUrl);
   const state = stateWithNote("A note");
 
   let result = await jsonRequest(baseUrl, "/api/state");
@@ -84,6 +145,7 @@ test("state and documents round-trip through the API", async (t) => {
 
   result = await jsonRequest(baseUrl, "/api/state", {
     method: "PUT",
+    cookie,
     body: JSON.stringify({ state })
   });
   assert.equal(result.response.status, 200);
@@ -91,6 +153,7 @@ test("state and documents round-trip through the API", async (t) => {
 
   result = await jsonRequest(baseUrl, "/api/docs/n_one", {
     method: "PUT",
+    cookie,
     body: JSON.stringify({ value: "<p>Hello</p>" })
   });
   assert.equal(result.response.status, 200);
@@ -102,19 +165,23 @@ test("state and documents round-trip through the API", async (t) => {
 
 test("import atomically replaces the previous journal", async (t) => {
   const { baseUrl } = await startTestServer(t);
+  const cookie = await signIn(baseUrl);
 
   await jsonRequest(baseUrl, "/api/state", {
     method: "PUT",
+    cookie,
     body: JSON.stringify({ state: stateWithNote("Old") })
   });
   await jsonRequest(baseUrl, "/api/docs/n_one", {
     method: "PUT",
+    cookie,
     body: JSON.stringify({ value: "<p>Old note</p>" })
   });
 
   const importedState = stateWithNote("Imported");
   const result = await jsonRequest(baseUrl, "/api/import", {
     method: "POST",
+    cookie,
     body: JSON.stringify({
       state: importedState,
       docs: { n_one: "<p>Imported note</p>" }
@@ -130,9 +197,11 @@ test("import atomically replaces the previous journal", async (t) => {
 
 test("invalid payloads are rejected without replacing data", async (t) => {
   const { baseUrl } = await startTestServer(t);
+  const cookie = await signIn(baseUrl);
 
   const result = await jsonRequest(baseUrl, "/api/state", {
     method: "PUT",
+    cookie,
     body: JSON.stringify({ state: { root: null } })
   });
   assert.equal(result.response.status, 400);
@@ -155,6 +224,30 @@ test("journal data survives a new store instance", async (t) => {
   await secondStore.init();
   assert.equal((await secondStore.readState()).root.children[0].name, "Persisted");
   assert.equal((await secondStore.readDocs()).n_one, "<p>Still here</p>");
+});
+
+test("large journals are streamed instead of buffered", async (t) => {
+  const { baseUrl } = await startTestServer(t);
+  const cookie = await signIn(baseUrl);
+  const bigValue = "x".repeat(1024 * 1024);
+
+  await jsonRequest(baseUrl, "/api/state", {
+    method: "PUT",
+    cookie,
+    body: JSON.stringify({ state: stateWithNote("Big note") })
+  });
+  await jsonRequest(baseUrl, "/api/docs/n_one", {
+    method: "PUT",
+    cookie,
+    body: JSON.stringify({ value: bigValue })
+  });
+
+  const response = await fetch(baseUrl + "/api/journal");
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-length"), null);
+  const body = await response.json();
+  assert.equal(body.docs.n_one.length, bigValue.length);
+  assert.equal(body.state.root.children[0].name, "Big note");
 });
 
 test("the web app is served without exposing server source or data", async (t) => {

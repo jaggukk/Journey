@@ -164,6 +164,8 @@
   };
   J.readOnly = false;
   J.adminConfigured = false;
+  J.adminUsername = "";
+  J.adminLocalDefaults = false;
 
   J.initStorage = async function initStorage() {
     try {
@@ -177,6 +179,8 @@
       J.storage.images = health.images === "blob" ? "blob" : "inline";
       J.readOnly = !health.canEdit;
       J.adminConfigured = Boolean(health.adminConfigured);
+      J.adminUsername = typeof health.adminUsername === "string" ? health.adminUsername : "";
+      J.adminLocalDefaults = Boolean(health.localDefaults);
     } catch (error) {
       J.storage.server = false;
       J.storage.unavailable = true;
@@ -188,10 +192,10 @@
     }
   };
 
-  J.authLogin = async function authLogin(password) {
+  J.authLogin = async function authLogin(username, password) {
     await apiRequest("/auth/login", {
       method: "POST",
-      body: { password }
+      body: { username, password }
     });
     J.readOnly = false;
   };

@@ -17,6 +17,24 @@
     adminButton.setAttribute("aria-label", adminButton.title);
   }
 
+  function field(name, labelText, type) {
+    const label = document.createElement("label");
+    label.className = "field";
+    const span = document.createElement("span");
+    span.className = "field-label";
+    span.textContent = labelText;
+    const input = document.createElement("input");
+    input.className = "text-input";
+    input.type = type;
+    input.autocomplete = type === "password" ? "current-password" : "username";
+    input.dataset.field = name;
+    input.spellcheck = false;
+    input.autocapitalize = "none";
+    label.appendChild(span);
+    label.appendChild(input);
+    return { label, input };
+  }
+
   function openLogin() {
     J.openModal({
       title: "Admin sign in",
@@ -24,32 +42,33 @@
       build: (content) => {
         const copy = document.createElement("p");
         copy.className = "dialog-copy";
-        copy.textContent = "Sign in to create, edit, and delete journal entries on this browser.";
-        const label = document.createElement("label");
-        label.className = "field";
-        const labelText = document.createElement("span");
-        labelText.className = "field-label";
-        labelText.textContent = "Password";
-        const input = document.createElement("input");
-        input.className = "text-input";
-        input.type = "password";
-        input.autocomplete = "current-password";
-        input.dataset.field = "password";
-        input.spellcheck = false;
-        label.appendChild(labelText);
-        label.appendChild(input);
+        copy.textContent = "Sign in to create, edit, and delete journal entries.";
+        const username = field("username", "Username", "text");
+        if (J.adminUsername) username.input.value = J.adminUsername;
+        const password = field("password", "Password", "password");
         content.appendChild(copy);
-        content.appendChild(label);
+        content.appendChild(username.label);
+        content.appendChild(password.label);
+        if (J.adminLocalDefaults) {
+          const hint = document.createElement("p");
+          hint.className = "dialog-copy";
+          hint.textContent =
+            "This server is using the local defaults: admin / journey. Add JOURNEY_ADMIN_USERNAME and JOURNEY_ADMIN_PASSWORD to .env to change them.";
+          content.appendChild(hint);
+        }
       },
       onSubmit: async (content) => {
-        const input = content.querySelector('[data-field="password"]');
-        const password = input.value;
+        const usernameInput = content.querySelector('[data-field="username"]');
+        const passwordInput = content.querySelector('[data-field="password"]');
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+        if (!username) return { ok: false, error: "Enter your admin username." };
         if (!password) return { ok: false, error: "Enter your admin password." };
         try {
-          await J.authLogin(password);
+          await J.authLogin(username, password);
           return { ok: true, value: true };
         } catch (error) {
-          return { ok: false, error: error.message || "That password is not correct." };
+          return { ok: false, error: error.message || "That username or password is not correct." };
         }
       }
     }).then((signedIn) => {
@@ -68,6 +87,8 @@
       const health = await response.json();
       J.readOnly = !health.canEdit;
       J.adminConfigured = Boolean(health.adminConfigured);
+      J.adminUsername = typeof health.adminUsername === "string" ? health.adminUsername : "";
+      J.adminLocalDefaults = Boolean(health.localDefaults);
       renderAdmin();
       J.toast("Signed out.");
     } catch (error) {

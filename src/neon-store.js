@@ -15,6 +15,11 @@ export class NeonJournalStore {
     this.schemaPromise = null;
   }
 
+  async init() {
+    await this.ensureSchema();
+    return this;
+  }
+
   ensureSchema() {
     if (!this.schemaPromise) {
       this.schemaPromise = (async () => {

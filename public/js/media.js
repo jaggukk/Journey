@@ -54,8 +54,8 @@
     }
 
     if (file.type === "image/gif") {
-      if (file.size > 8 * 1024 * 1024) {
-        throw new Error("That GIF is larger than 8 MB. Try a smaller one.");
+      if (file.size > 3 * 1024 * 1024) {
+        throw new Error("That GIF is larger than 3 MB. Try a smaller one.");
       }
       const dataUrl = await J.readDataUrl(file);
       const img = await J.loadImageElement(dataUrl);

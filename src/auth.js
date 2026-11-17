@@ -4,6 +4,8 @@ const COOKIE_NAME = "journey_admin";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 8;
+const DEFAULT_USERNAME = "admin";
+const LOCAL_DEFAULT_PASSWORD = "journey";
 
 function digest(value) {
   return createHash("sha256").update(String(value), "utf8").digest();
@@ -97,38 +99,40 @@ function requestAddress(request) {
 
 export function createAuth(options) {
   const opts = options || {};
-  const password = String(
-    opts.password !== undefined ? opts.password : process.env.JOURNEY_ADMIN_PASSWORD || ""
-  );
+  const has = (key) => Object.prototype.hasOwnProperty.call(opts, key);
+  const configuredPassword = has("password")
+    ? opts.password
+    : process.env.JOURNEY_ADMIN_PASSWORD;
   const passwordHash = String(
-    opts.passwordHash !== undefined
-      ? opts.passwordHash
-      : process.env.JOURNEY_ADMIN_PASSWORD_HASH || ""
+    has("passwordHash") ? opts.passwordHash : process.env.JOURNEY_ADMIN_PASSWORD_HASH || ""
   ).toLowerCase();
+  const configuredUsername = String(
+    has("username") ? opts.username : process.env.JOURNEY_ADMIN_USERNAME || ""
+  ).trim();
+  const isLocal = !process.env.VERCEL && process.env.NODE_ENV !== "production";
+  const useLocalDefaults = !configuredPassword && !passwordHash && isLocal;
+  const password = String(useLocalDefaults ? LOCAL_DEFAULT_PASSWORD : configuredPassword || "");
+  const username = configuredUsername || DEFAULT_USERNAME;
   const sessionSecret = String(
-    opts.sessionSecret !== undefined
+    has("sessionSecret")
       ? opts.sessionSecret
       : process.env.JOURNEY_SESSION_SECRET || password || passwordHash || ""
   );
-  const allowLocalEditing =
-    opts.allowLocalEditing !== undefined
-      ? Boolean(opts.allowLocalEditing)
-      : !process.env.VERCEL && process.env.NODE_ENV !== "production";
   const configured = Boolean(password || passwordHash);
   const attempts = new Map();
 
   function canEdit(request) {
-    if (configured) {
-      const cookies = parseCookies(request.headers.cookie);
-      return verifySession(cookies[COOKIE_NAME], sessionSecret);
-    }
-    return allowLocalEditing;
+    if (!configured) return false;
+    const cookies = parseCookies(request.headers.cookie);
+    return verifySession(cookies[COOKIE_NAME], sessionSecret);
   }
 
   function status(request) {
     return {
       canEdit: canEdit(request),
-      adminConfigured: configured
+      adminConfigured: configured,
+      adminUsername: configured ? username : "",
+      localDefaults: useLocalDefaults
     };
   }
 
@@ -171,6 +175,10 @@ export function createAuth(options) {
     return equalSecrets(candidate, password);
   }
 
+  function usernameMatches(candidate) {
+    return typeof candidate === "string" && candidate.length > 0 && equalSecrets(candidate, username);
+  }
+
   function login(request, response) {
     if (!configured || !sessionSecret) {
       response.status(503).json({ error: "Admin sign-in is not configured on this server." });
@@ -183,10 +191,17 @@ export function createAuth(options) {
       return;
     }
 
-    const candidate = request.body && request.body.password;
-    if (typeof candidate !== "string" || !candidate || !passwordMatches(candidate)) {
+    const body = request.body || {};
+    const candidateUsername = body.username;
+    const candidatePassword = body.password;
+    if (
+      !usernameMatches(candidateUsername) ||
+      typeof candidatePassword !== "string" ||
+      !candidatePassword ||
+      !passwordMatches(candidatePassword)
+    ) {
       recordFailure(address);
-      response.status(401).json({ error: "That password is not correct." });
+      response.status(401).json({ error: "That username or password is not correct." });
       return;
     }
 
@@ -195,7 +210,7 @@ export function createAuth(options) {
       "Set-Cookie",
       sessionCookie(request, createSession(sessionSecret), SESSION_TTL_SECONDS)
     );
-    response.json({ ok: true, canEdit: true });
+    response.json({ ok: true, canEdit: true, username });
   }
 
   function logout(request, response) {

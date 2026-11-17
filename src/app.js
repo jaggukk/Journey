@@ -16,6 +16,25 @@ function asyncRoute(handler) {
   };
 }
 
+// Streams key/value pairs so responses are not capped by the platform's
+// buffered body limit (Vercel: 4.5 MB) as pictures accumulate.
+function writeJsonPairs(response, entries, first) {
+  let started = first;
+  for (const [key, value] of entries) {
+    if (!started) response.write(",");
+    started = false;
+    response.write(JSON.stringify(key) + ":" + JSON.stringify(value));
+  }
+  return started;
+}
+
+function streamJsonMap(response, entries, prefix, suffix) {
+  response.set("Content-Type", "application/json; charset=utf-8");
+  response.write(prefix);
+  writeJsonPairs(response, entries, true);
+  response.end(suffix);
+}
+
 export function createApp(options) {
   const opts = options || {};
   if (!opts.store) throw new Error("createApp requires a journal store.");
@@ -88,7 +107,7 @@ export function createApp(options) {
     "/api/docs",
     asyncRoute(async (request, response) => {
       const docs = await store.readDocs();
-      response.json({ docs });
+      streamJsonMap(response, Object.entries(docs), '{"docs":{', "}}");
     })
   );
 
@@ -121,7 +140,10 @@ export function createApp(options) {
     "/api/journal",
     asyncRoute(async (request, response) => {
       const [state, docs] = await Promise.all([store.readState(), store.readDocs()]);
-      response.json({ state: state || null, docs });
+      response.set("Content-Type", "application/json; charset=utf-8");
+      response.write('{"state":' + JSON.stringify(state || null) + ',"docs":{');
+      writeJsonPairs(response, Object.entries(docs), true);
+      response.end("}}");
     })
   );
 
