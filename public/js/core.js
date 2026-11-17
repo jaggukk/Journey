@@ -253,9 +253,9 @@
 
   J.storageSetDoc = async function storageSetDoc(id, value) {
     if (J.storage.unavailable) return false;
-    await apiRequest("/docs/" + encodeURIComponent(id), {
+    await apiRequest("/docs", {
       method: "PUT",
-      body: { value }
+      body: { id, value }
     });
     return true;
   };

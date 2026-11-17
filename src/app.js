@@ -117,13 +117,14 @@ export function createApp(options) {
   );
 
   app.put(
-    "/api/docs/:id",
+    "/api/docs",
     auth.requireEditor,
     asyncRoute(async (request, response) => {
-      const id = normalizeDocumentId(request.params.id);
-      const value = normalizeDocumentValue(request.body && request.body.value);
-      await store.writeDoc(id, value);
-      response.json({ ok: true, id });
+      const { id, value } = request.body || {};
+      const docId = normalizeDocumentId(id);
+      const docValue = normalizeDocumentValue(request.body && request.body.value);
+      await store.writeDoc(docId, docValue);
+      response.json({ ok: true, id: docId });
     })
   );
 
