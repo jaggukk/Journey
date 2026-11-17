@@ -151,10 +151,10 @@ test("state and documents round-trip through the API", async (t) => {
   assert.equal(result.response.status, 200);
   assert.equal(result.body.state.root.children[0].name, "A note");
 
-  result = await jsonRequest(baseUrl, "/api/docs/n_one", {
+  result = await jsonRequest(baseUrl, "/api/docs", {
     method: "PUT",
     cookie,
-    body: JSON.stringify({ value: "<p>Hello</p>" })
+    body: JSON.stringify({ id: "n_one", value: "<p>Hello</p>" })
   });
   assert.equal(result.response.status, 200);
 
@@ -172,10 +172,10 @@ test("import atomically replaces the previous journal", async (t) => {
     cookie,
     body: JSON.stringify({ state: stateWithNote("Old") })
   });
-  await jsonRequest(baseUrl, "/api/docs/n_one", {
+  await jsonRequest(baseUrl, "/api/docs", {
     method: "PUT",
     cookie,
-    body: JSON.stringify({ value: "<p>Old note</p>" })
+    body: JSON.stringify({ id: "n_one", value: "<p>Old note</p>" })
   });
 
   const importedState = stateWithNote("Imported");
@@ -236,10 +236,10 @@ test("large journals are streamed instead of buffered", async (t) => {
     cookie,
     body: JSON.stringify({ state: stateWithNote("Big note") })
   });
-  await jsonRequest(baseUrl, "/api/docs/n_one", {
+  await jsonRequest(baseUrl, "/api/docs", {
     method: "PUT",
     cookie,
-    body: JSON.stringify({ value: bigValue })
+    body: JSON.stringify({ id: "n_one", value: bigValue })
   });
 
   const response = await fetch(baseUrl + "/api/journal");
