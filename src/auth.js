@@ -83,7 +83,7 @@ function sessionCookie(request, value, maxAge) {
     `${COOKIE_NAME}=${encodeURIComponent(value)}`,
     "Path=/",
     "HttpOnly",
-    "SameSite=Strict",
+    "SameSite=Lax",
     `Max-Age=${maxAge}`
   ];
   if (isSecureRequest(request)) parts.push("Secure");
@@ -215,7 +215,7 @@ export function createAuth(options) {
   function logout(request, response) {
     response.setHeader("Set-Cookie", [
       sessionCookie(request, "", 0),
-      `journey_admin=; Path=/; HttpOnly; SameSite=Strict; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
+      `journey_admin=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
     ]);
     response.json({ ok: true, canEdit: false });
   }
